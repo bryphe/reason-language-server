@@ -1,4 +1,3 @@
-
 type target =
   | Js
   | Bytecode
@@ -28,6 +27,7 @@ type t =
 let isNative = config => Json.get("entries", config) != None || Json.get("allowed-build-kinds", config) != None;
 
 let getLine = (cmd, ~pwd) => {
+  prerr_endline("COMMAND: " ++ cmd);
   switch (Commands.execFull(~pwd, cmd)) {
     | ([line], _, true) => RResult.Ok(line)
     | (out, err, _) => Error("Invalid response for " ++ cmd ++ "\n\n" ++ String.concat("\n", out @ err))
@@ -130,10 +130,26 @@ let detect = (rootPath, bsconfig) => {
 let getEsyCompiledBase = (root) => {
   let env = Unix.environment()->Array.to_list;
 
-  switch(Utils.getEnvVar(~env, "cur__original_root"), Utils.getEnvVar(~env, "cur__target_dir")) {
-  | (Some(projectRoot), Some(targetDir)) => Ok(Files.relpath(projectRoot, targetDir))
-  | (_, _) =>
-    switch (Commands.execResult("esy command-env --json")) {
+  prerr_endline("BuildSystem::getEsyCompiledBase - root:" ++ root);
+  prerr_endline("BuildSystem::getEsyCompiledBase - cwd: " ++ Unix.getcwd());
+
+  let correctSlashesOnWindows = (p) => {
+      let slashRegex = Str.regexp("/");
+      Str.global_replace(slashRegex, "\\\\", p);
+  };
+
+  /* switch(Utils.getEnvVar(~env, "cur__original_root"), Utils.getEnvVar(~env, "cur__target_dir")) { */
+  /* | (Some(projectRoot), Some(targetDir)) => */ 
+  /*       prerr_endline ("DEBUG: BuildSystem::getEsyCompiledBase - Got from environment!"); */
+  /*       Ok(Files.relpath(correctSlashesOnWindows(projectRoot), correctSlashesOnWindows(targetDir))) */
+  /* | (_, _) => */
+   
+     let prevCwd = Unix.getcwd();
+     Unix.chdir(root);
+    let res = Commands.execResult("esy command-env --json")
+     Unix.chdir(prevCwd);
+        
+    switch (res) {
     | Ok(commandEnv) =>
       switch (Json.parse(commandEnv)) {
       | exception (Failure(message)) =>
@@ -144,22 +160,25 @@ let getEsyCompiledBase = (root) => {
         Log.log(commandEnv);
         Error("Couldn't find Esy target directory (invalid json response) " ++ Printexc.to_string(exn));
       | json =>
+        prerr_endline ("DEBUG: BuildSystem::getEsyCompiledBase - Got from command-env!");
         Json.Infix.(
           switch (
             Json.get("cur__original_root", json) |?> Json.string,
             Json.get("cur__target_dir", json) |?> Json.string,
           ) {
-          | (Some(projectRoot), Some(targetDir)) => Ok(Files.relpath(projectRoot, targetDir))
+          | (Some(projectRoot), Some(targetDir)) => Ok(Files.relpath(correctSlashesOnWindows(projectRoot), correctSlashesOnWindows(targetDir)))
           | _ => Error("Couldn't find Esy target directory (missing json entries)")
           }
         )
       }
     | err => err
     }
-  }
+  /* } */
 };
 
 let getCompiledBase = (root, buildSystem) => {
+
+  prerr_endline ("DEBUG BuildSystem::getCompiledBase - root: " ++ root);
   let compiledBase = switch (buildSystem) {
   | Bsb("3.2.0") => Ok(root /+ "lib" /+ "bs" /+ "js")
   | Bsb("3.1.1") => Ok(root /+ "lib" /+ "ocaml")
@@ -170,11 +189,15 @@ let getCompiledBase = (root, buildSystem) => {
   | Dune(Opam(_)) => Ok(root /+ "_build") /* TODO maybe check DUNE_BUILD_DIR */
   | Dune(Esy) =>
     let%try_wrap esyTargetDir = getEsyCompiledBase(root);
+    prerr_endline ("DEBUG BuildSystem::getCompiledBase - esyTargetDir: " ++ esyTargetDir);
     root /+ esyTargetDir
   };
 
   switch compiledBase {
-  | Ok(compiledBase) => Files.ifExists(compiledBase);
+  | Ok(compiledBase) => {
+      prerr_endline ("BuildSystem::getCompiledBase - checking if exists: " ++ compiledBase);
+      Files.ifExists(compiledBase);
+  }
   | err => None
   };
 };
@@ -219,7 +242,8 @@ let getStdlib = (base, buildSystem) => {
     switch (Utils.getEnvVar(~env, "OCAMLLIB")) {
     | Some(esy_ocamllib) => Ok([esy_ocamllib])
     | None =>
-      let%try_wrap esy_ocamllib = getLine("esy -q sh -- -c 'echo $OCAMLLIB'", ~pwd=base);
+      let%try_wrap esy_ocamllib = getLine("esy b echo $OCAMLLIB", ~pwd=base);
+      prerr_endline ("esy_ocamllib DERP: " ++ esy_ocamllib);
       [esy_ocamllib];
     };
   | Dune(Opam(switchPrefix)) =>
@@ -234,10 +258,11 @@ let isRunningInEsyNamedSandbox = () => {
 };
 
 let getExecutableInEsyPath = (exeName, ~pwd) => {
+  let whichCommand = Sys.win32 ? "where" : "which"
   if (isRunningInEsyNamedSandbox()) {
-    getLine("which " ++ exeName, ~pwd)
+    getLine(whichCommand ++ " " ++ exeName, ~pwd)
   } else {
-    getLine("esy which " ++ exeName, ~pwd)
+    getLine("esy " ++ whichCommand ++ " " ++ exeName, ~pwd)
   }
 };
 

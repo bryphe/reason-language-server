@@ -289,10 +289,13 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
 
   let%try projectRoot = findJbuilderProjectRoot(Filename.dirname(rootPath));
   Log.log("=== Project root: " ++ projectRoot);
+  prerr_endline("=== Project root: " ++ projectRoot);
 
   let%try pkgMgr = BuildSystem.inferPackageManager(projectRoot);
+  prerr_endline("State::newJbuilderPackage - got pkgMgr");
 
   let buildSystem = BuildSystem.Dune(pkgMgr);
+  prerr_endline("State::newJbuilderPackage - got buildSystem");
 
   let%try buildDir =
     BuildSystem.getCompiledBase(projectRoot, buildSystem)
@@ -517,12 +520,16 @@ let getPackage = (~reportDiagnostics, uri, state) => {
   if (Hashtbl.mem(state.rootForUri, uri)) {
     RResult.Ok(Hashtbl.find(state.packagesByRoot, Hashtbl.find(state.rootForUri, uri)))
   } else {
+    prerr_endline("State::getPackage - trying to find root...");
     let%try root = findRoot(uri, state.packagesByRoot) |> RResult.orError("No root directory found");
+    prerr_endline("State::getPackage - got root!");
     let%try package = switch root {
     | `Root(rootPath) =>
+       prerr_endline("State::getPackage - `ROOT`" ++ rootPath);
       Hashtbl.replace(state.rootForUri, uri, rootPath);
       RResult.Ok(Hashtbl.find(state.packagesByRoot, Hashtbl.find(state.rootForUri, uri)))
     | `Bs(rootPath) =>
+       prerr_endline("State::getPackage - `BS`" ++ rootPath);
       let%try package = newBsPackage(~reportDiagnostics, state, rootPath);
       Files.mkdirp(package.tmpPath);
       let package = {
@@ -534,6 +541,7 @@ let getPackage = (~reportDiagnostics, uri, state) => {
       Hashtbl.replace(state.packagesByRoot, package.basePath, package);
       RResult.Ok(package)
     | `Jbuilder(path) =>
+       prerr_endline("State::getPackage - `JBUILDER`" ++ path);
       Log.log("]] Making a new jbuilder package at " ++ path);
       let%try package = newJbuilderPackage(~reportDiagnostics, state, path);
       Files.mkdirp(package.tmpPath);

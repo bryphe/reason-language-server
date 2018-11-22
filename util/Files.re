@@ -25,7 +25,8 @@ let sliceToEnd = (str, pos) => String.sub(str, pos, String.length(str) - pos);
   (("/a/b/c", "/a/b/c/d/e"), "./d/e"),
 ]]
 let relpath = (base, path) => {
-  if (startsWith(path, base)) {
+  prerr_endline ("Util/Files.re - relpath - base: " ++ base ++ " path: " ++ path);
+  let ret = if (startsWith(path, base)) {
     let baselen = String.length(base);
     let rest = String.sub(path, baselen, String.length(path) - baselen);
     if (rest == "") {
@@ -53,6 +54,8 @@ let relpath = (base, path) => {
     let (base, path) = loop(split(Filename.dir_sep, base), split(Filename.dir_sep, path));
     String.concat(Filename.dir_sep, (base == [] ? ["."] : List.map((_) => "..", base)) @ path) |> removeExtraDots
   }
+  prerr_endline(" -- returned: " ++ ret);
+  ret;
 };
 
 let symlink = (source, dest) => {
@@ -170,6 +173,7 @@ let isDirectory = path => switch (maybeStat(path)) {
 };
 
 let readDirectory = (dir) => {
+  prerr_endline("util/Files.re - readDirectory: " ++ dir);
   let maybeGet = (handle) =>
     try (Some(Unix.readdir(handle))) {
     | End_of_file => None
