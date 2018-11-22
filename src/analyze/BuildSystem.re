@@ -134,8 +134,12 @@ let getEsyCompiledBase = (root) => {
   prerr_endline("BuildSystem::getEsyCompiledBase - cwd: " ++ Unix.getcwd());
 
   let correctSlashesOnWindows = (p) => {
-      let slashRegex = Str.regexp("/");
-      Str.global_replace(slashRegex, "\\\\", p);
+      if (Sys.win32) {
+          let slashRegex = Str.regexp("/");
+          Str.global_replace(slashRegex, "\\\\", p);
+      } else {
+          p
+      }
   };
 
   /* switch(Utils.getEnvVar(~env, "cur__original_root"), Utils.getEnvVar(~env, "cur__target_dir")) { */
