@@ -304,10 +304,15 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
     );
   Log.log("=== Build dir:    " ++ buildDir);
 
+  prerr_endline("State::newJbuilderPackage - got build dir: " ++ buildDir);
+
   let%try merlinRaw = Files.readFileResult(rootPath /+ ".merlin");
   let (source, build, flags) = MerlinFile.parseMerlin("", merlinRaw);
 
+  prerr_endline("State::newJbuilderPackage - past merlin.");
+
   let%try (jbuildPath, jbuildRaw) = JbuildFile.readFromDir(rootPath);
+  prerr_endline("State::newJbuilderPackage - successfully read jbuild file");
   let%try jbuildConfig = switch (JbuildFile.parse(jbuildRaw)) {
     | exception Failure(message) => Error("Unable to parse build file " ++ jbuildPath ++ " " ++ message)
     | x => Ok(x)
@@ -340,6 +345,8 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
     | _ => None
   };
 
+  prerr_endline("State::newJbuilderPackage - got a compiled base: " ++ compiledBase);
+
   /* print_endline("locals"); */
   Log.log("Got a compiled base " ++ compiledBase);
   let localModules = sourceFiles |> List.map(filename => {
@@ -349,6 +356,7 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
       | `Library(libraryName) =>
         String.capitalize(libraryName) ++ "__" ++ String.capitalize(name)
     };
+      prerr_endline("Local file: " ++ (rootPath /+ filename));
     Log.log("Local file: " ++ (rootPath /+ filename));
     let implCmtPath =
       compiledBase
@@ -365,7 +373,7 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
   });
 
 
-  /* print_endline("Getting things"); */
+  prerr_endline("Getting things");
   let (otherDirectories, otherFiles) = source |> List.filter(s => s != "." && s != "" && s.[0] != '/') |> optMap(name => {
     let otherPath = rootPath /+ name;
     let res = {
@@ -378,6 +386,7 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
         | `Library(name) => RResult.Ok(name)
         | _ => Error("Not a library")
       };
+      prerr_endline (" -- things: libraryName " ++ libraryName);
       let rel = Files.relpath(projectRoot, otherPath);
       let compiledBase = buildDir /+ "default" /+ rel /+ "." ++ libraryName ++ ".objs";
       Log.log("Other directory: " ++ compiledBase);
@@ -405,6 +414,7 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
 
   let dependencyModules = dependencyDirectories
   |> List.map(path => {
+    prerr_endline(">> Collecting deps for " ++ path);
     Log.log(">> Collecting deps for " ++ path);
     Files.readDirectory(Infix.maybeConcat(rootPath, path))
     |> List.filter(FindFiles.isCompiledFile)
