@@ -183,9 +183,7 @@ let getCompiledBase = (root, buildSystem) => {
   };
 
   switch compiledBase {
-  | Ok(compiledBase) => {
-      Files.ifExists(compiledBase);
-  }
+  | Ok(compiledBase) => Files.ifExists(compiledBase);
   | err => None
   };
 };
