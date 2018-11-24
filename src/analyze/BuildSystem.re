@@ -138,11 +138,11 @@ let getEsyCompiledBase = (root) => {
       }
   };
 
-  /* switch(Utils.getEnvVar(~env, "cur__original_root"), Utils.getEnvVar(~env, "cur__target_dir")) { */
-  /* | (Some(projectRoot), Some(targetDir)) => */ 
-  /*       prerr_endline ("DEBUG: BuildSystem::getEsyCompiledBase - Got from environment!"); */
-  /*       Ok(Files.relpath(correctSlashesOnWindows(projectRoot), correctSlashesOnWindows(targetDir))) */
-  /* | (_, _) => */
+  switch(Utils.getEnvVar(~env, "cur__original_root"), Utils.getEnvVar(~env, "cur__target_dir")) {
+  | (Some(projectRoot), Some(targetDir)) => 
+        prerr_endline ("DEBUG: BuildSystem::getEsyCompiledBase - Got from environment!");
+        Ok(Files.relpath(correctSlashesOnWindows(projectRoot), correctSlashesOnWindows(targetDir)))
+  | (_, _) =>
    
      let prevCwd = Unix.getcwd();
      Unix.chdir(root);
@@ -172,7 +172,7 @@ let getEsyCompiledBase = (root) => {
       }
     | err => err
     }
-  /* } */
+  }
 };
 
 let getCompiledBase = (root, buildSystem) => {
