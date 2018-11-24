@@ -27,7 +27,6 @@ type t =
 let isNative = config => Json.get("entries", config) != None || Json.get("allowed-build-kinds", config) != None;
 
 let getLine = (cmd, ~pwd) => {
-  prerr_endline("COMMAND: " ++ cmd);
   switch (Commands.execFull(~pwd, cmd)) {
     | ([line], _, true) => RResult.Ok(line)
     | (out, err, _) => Error("Invalid response for " ++ cmd ++ "\n\n" ++ String.concat("\n", out @ err))
@@ -130,9 +129,6 @@ let detect = (rootPath, bsconfig) => {
 let getEsyCompiledBase = (root) => {
   let env = Unix.environment()->Array.to_list;
 
-  prerr_endline("BuildSystem::getEsyCompiledBase - root:" ++ root);
-  prerr_endline("BuildSystem::getEsyCompiledBase - cwd: " ++ Unix.getcwd());
-
   let correctSlashesOnWindows = (p) => {
       if (Sys.win32) {
           let slashRegex = Str.regexp("/");
@@ -164,7 +160,6 @@ let getEsyCompiledBase = (root) => {
         Log.log(commandEnv);
         Error("Couldn't find Esy target directory (invalid json response) " ++ Printexc.to_string(exn));
       | json =>
-        prerr_endline ("DEBUG: BuildSystem::getEsyCompiledBase - Got from command-env!");
         Json.Infix.(
           switch (
             Json.get("cur__original_root", json) |?> Json.string,
@@ -181,8 +176,6 @@ let getEsyCompiledBase = (root) => {
 };
 
 let getCompiledBase = (root, buildSystem) => {
-
-  prerr_endline ("DEBUG BuildSystem::getCompiledBase - root: " ++ root);
   let compiledBase = switch (buildSystem) {
   | Bsb("3.2.0") => Ok(root /+ "lib" /+ "bs" /+ "js")
   | Bsb("3.1.1") => Ok(root /+ "lib" /+ "ocaml")
@@ -193,13 +186,11 @@ let getCompiledBase = (root, buildSystem) => {
   | Dune(Opam(_)) => Ok(root /+ "_build") /* TODO maybe check DUNE_BUILD_DIR */
   | Dune(Esy) =>
     let%try_wrap esyTargetDir = getEsyCompiledBase(root);
-    prerr_endline ("DEBUG BuildSystem::getCompiledBase - esyTargetDir: " ++ esyTargetDir);
     root /+ esyTargetDir
   };
 
   switch compiledBase {
   | Ok(compiledBase) => {
-      prerr_endline ("BuildSystem::getCompiledBase - checking if exists: " ++ compiledBase);
       Files.ifExists(compiledBase);
   }
   | err => None
@@ -247,7 +238,6 @@ let getStdlib = (base, buildSystem) => {
     | Some(esy_ocamllib) => Ok([esy_ocamllib])
     | None =>
       let%try_wrap esy_ocamllib = getLine("esy b echo $OCAMLLIB", ~pwd=base);
-      prerr_endline ("esy_ocamllib DERP: " ++ esy_ocamllib);
       [esy_ocamllib];
     };
   | Dune(Opam(switchPrefix)) =>

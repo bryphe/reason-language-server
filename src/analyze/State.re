@@ -289,13 +289,10 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
 
   let%try projectRoot = findJbuilderProjectRoot(Filename.dirname(rootPath));
   Log.log("=== Project root: " ++ projectRoot);
-  prerr_endline("=== Project root: " ++ projectRoot);
 
   let%try pkgMgr = BuildSystem.inferPackageManager(projectRoot);
-  prerr_endline("State::newJbuilderPackage - got pkgMgr");
 
   let buildSystem = BuildSystem.Dune(pkgMgr);
-  prerr_endline("State::newJbuilderPackage - got buildSystem");
 
   let%try buildDir =
     BuildSystem.getCompiledBase(projectRoot, buildSystem)
@@ -304,15 +301,10 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
     );
   Log.log("=== Build dir:    " ++ buildDir);
 
-  prerr_endline("State::newJbuilderPackage - got build dir: " ++ buildDir);
-
   let%try merlinRaw = Files.readFileResult(rootPath /+ ".merlin");
   let (source, build, flags) = MerlinFile.parseMerlin("", merlinRaw);
 
-  prerr_endline("State::newJbuilderPackage - past merlin.");
-
   let%try (jbuildPath, jbuildRaw) = JbuildFile.readFromDir(rootPath);
-  prerr_endline("State::newJbuilderPackage - successfully read jbuild file");
   let%try jbuildConfig = switch (JbuildFile.parse(jbuildRaw)) {
     | exception Failure(message) => Error("Unable to parse build file " ++ jbuildPath ++ " " ++ message)
     | x => Ok(x)
@@ -345,8 +337,6 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
     | _ => None
   };
 
-  prerr_endline("State::newJbuilderPackage - got a compiled base: " ++ compiledBase);
-
   /* print_endline("locals"); */
   Log.log("Got a compiled base " ++ compiledBase);
   let localModules = sourceFiles |> List.map(filename => {
@@ -356,7 +346,6 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
       | `Library(libraryName) =>
         String.capitalize(libraryName) ++ "__" ++ String.capitalize(name)
     };
-      prerr_endline("Local file: " ++ (rootPath /+ filename));
     Log.log("Local file: " ++ (rootPath /+ filename));
     let implCmtPath =
       compiledBase
@@ -372,8 +361,6 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
     );
   });
 
-
-  prerr_endline("Getting things");
   let (otherDirectories, otherFiles) = source |> List.filter(s => s != "." && s != "" && s.[0] != '/') |> optMap(name => {
     let otherPath = rootPath /+ name;
     let res = {
@@ -386,7 +373,6 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
         | `Library(name) => RResult.Ok(name)
         | _ => Error("Not a library")
       };
-      prerr_endline (" -- things: libraryName " ++ libraryName);
       let rel = Files.relpath(projectRoot, otherPath);
       let compiledBase = buildDir /+ "default" /+ rel /+ "." ++ libraryName ++ ".objs";
       Log.log("Other directory: " ++ compiledBase);
@@ -414,7 +400,6 @@ let newJbuilderPackage = (~reportDiagnostics, state, rootPath) => {
 
   let dependencyModules = dependencyDirectories
   |> List.map(path => {
-    prerr_endline(">> Collecting deps for " ++ path);
     Log.log(">> Collecting deps for " ++ path);
     Files.readDirectory(Infix.maybeConcat(rootPath, path))
     |> List.filter(FindFiles.isCompiledFile)
@@ -530,16 +515,12 @@ let getPackage = (~reportDiagnostics, uri, state) => {
   if (Hashtbl.mem(state.rootForUri, uri)) {
     RResult.Ok(Hashtbl.find(state.packagesByRoot, Hashtbl.find(state.rootForUri, uri)))
   } else {
-    prerr_endline("State::getPackage - trying to find root...");
     let%try root = findRoot(uri, state.packagesByRoot) |> RResult.orError("No root directory found");
-    prerr_endline("State::getPackage - got root!");
     let%try package = switch root {
     | `Root(rootPath) =>
-       prerr_endline("State::getPackage - `ROOT`" ++ rootPath);
       Hashtbl.replace(state.rootForUri, uri, rootPath);
       RResult.Ok(Hashtbl.find(state.packagesByRoot, Hashtbl.find(state.rootForUri, uri)))
     | `Bs(rootPath) =>
-       prerr_endline("State::getPackage - `BS`" ++ rootPath);
       let%try package = newBsPackage(~reportDiagnostics, state, rootPath);
       Files.mkdirp(package.tmpPath);
       let package = {
@@ -551,7 +532,6 @@ let getPackage = (~reportDiagnostics, uri, state) => {
       Hashtbl.replace(state.packagesByRoot, package.basePath, package);
       RResult.Ok(package)
     | `Jbuilder(path) =>
-       prerr_endline("State::getPackage - `JBUILDER`" ++ path);
       Log.log("]] Making a new jbuilder package at " ++ path);
       let%try package = newJbuilderPackage(~reportDiagnostics, state, path);
       Files.mkdirp(package.tmpPath);
